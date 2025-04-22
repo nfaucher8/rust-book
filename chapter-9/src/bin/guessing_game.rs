@@ -2,18 +2,30 @@ use rand::Rng;
 
 use std::cmp::Ordering;
 use std::io;
+use std::num::ParseIntError;
 
 pub struct Guess {
     value: i32,
 }
 
-impl Guess {
-    pub fn new(value: i32) -> Guess {
-        if value < 1 || value > 100 {
-            panic!("Guess value must be between 1 and 100, got {value}");
-        }
+#[derive(Debug)]
+pub enum GuessError {
+    ValueTooLow,
+    ValueTooHigh,
+    InvalidNumber,
+    Unknown(ParseIntError),
+}
 
-        Guess { value }
+impl Guess {
+    pub fn new(value: &str) -> Result<Guess, GuessError> {
+        match value.trim().parse() {
+            Ok(value) => match value {
+                i32::MIN..0 => Err(GuessError::ValueTooLow),
+                0..=100 => Ok(Guess { value }),
+                101..=i32::MAX => Err(GuessError::ValueTooHigh),
+            },
+            Err(e) => Err(GuessError::Unknown(e)),
+        }
     }
 
     pub fn value(&self) -> i32 {
@@ -35,14 +47,17 @@ fn main() {
             .read_line(&mut guess)
             .expect("Failed to read line");
 
-        let guess: u32 = match guess.trim().parse() {
-            Ok(num) => num,
-            Err(_) => continue,
+        let guess = match Guess::new(&guess) {
+            Ok(guess) => guess,
+            Err(e) => {
+                println!("Error: {e:?}");
+                continue
+            },
         };
 
-        println!("You guessed: {}", guess);
+        println!("You guessed: {}", guess.value());
 
-        match guess.cmp(&secret_number) {
+        match guess.value().cmp(&secret_number) {
             Ordering::Less => println!("Too small!"),
             Ordering::Greater => println!("Too big!"),
             Ordering::Equal => {
